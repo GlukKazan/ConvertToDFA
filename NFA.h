@@ -4,20 +4,15 @@
 
 namespace RegExp {
 
-// Конструирование NFA по выражениям вида: Q< D< C<'a'>, E< C<'b'>, C<'c'> > >, 0, 1> - (a|bc)?
 template <char Chr>
 struct C
 { typedef typename Node<NullType,0,1,Chr> Result;
   enum {Count = 2};
 };
 
-// 0 -> 0
-// x -> x + (count-1)
 template <int X, int N>
 struct ConvA { enum { Result = (X==1) ? (X+N-1) : X }; };
 
-// 1 -> 1
-// x -> x + (count)
 template <int X, int N>
 struct ConvB { enum { Result = (X==1) ? 1 : (X+N) }; };
 
@@ -35,7 +30,6 @@ struct E: public EImpl<T1, E<T2,T3,T4,T5> > {};
 template <class T1, class T2>
 struct E<T1,T2,NullType,NullType,NullType>: public EImpl<T1,T2> {};
 
-// x -> x + N
 template <int X, int N>
 struct Add { enum { Result = X+N }; };
 
