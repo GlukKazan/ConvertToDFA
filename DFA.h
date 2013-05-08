@@ -7,9 +7,10 @@ enum CONSTS {
    MAX_FIN_STATE = 9
 };
 
+// Реализация DFA
 template <class Graph> class DFAImpl;
 template <class T, int Src, int Dst, char Chr>
-class DFAImpl<Node<T,Src,Dst,Chr> >: public DFAImpl<typename T>
+class DFAImpl<Edge<T,Src,Dst,Chr> >: public DFAImpl<typename T>
 { public:
     typedef typename    DFAImpl<typename T>::ResultType ResultType;
     ResultType          Parse(char C)
@@ -43,15 +44,25 @@ class DFAImpl<NullType>
     int                 State;
 };
 
+// Вычисление хода (списка состояний) из вершины (При a==0 - e-ход)                                                 *
+// N - Узел
+// T - Граф
+// R - Результирующее состояние
+// a - Символ алфавита
 template <int N, class T, class R, int a = 0> struct Move;
 template <int N, class R, int a> struct Move<N,NullType,R,a> {typedef R Result;};
-template <int N, class T, int D, class R, int a> struct Move<N,Node<T,N,D,a>,R,a>
-{ typedef typename Move<N,T,typename InsSet<D,R,NullType>::Result,a>::Result Result;
+template <int N, class T, int D, class R, int a> struct Move<N,Edge<T,N,D,a>,R,a>
+{ typedef typename Move<N,T,typename AddSet<D,R,NullType>::Result,a>::Result Result;
 };
-template <int N, int M, class T, int D, class R, int a, int b> struct Move<N,Node<T,M,D,b>,R,a>
+template <int N, int M, class T, int D, class R, int a, int b> struct Move<N,Edge<T,M,D,b>,R,a>
 { typedef typename Move<N,T,R,a>::Result Result;
 };
 
+// Фильтрация списка по условию F                                                                                   *
+// T - Исходный список (Set, StateListEx)
+// С - Значение параметра предиката F
+// R - Результирующий список (Set, StateListEx)
+// F - Предикат (Exist, NotExist, Important)
 template <class T, class C, class R, template <int,class> class F> struct Filter;
 template <class C, class R, template <int,class> class F> struct Filter<NullType,C,R,F> {typedef R Result;};
 template <int N, class T, class C, class R, template <int,class> class F> struct Filter<Set<N,T>,C,R,F>
@@ -68,6 +79,10 @@ struct Filter<StateListEx<Src,Dst,a,S,T>,C,R,F>
                      >::Result Result;
 };
 
+// Вычисление e-замыкания                                                                                           *
+// T - Начальный список узлов
+// G - Граф
+// R - Результирующий список узлов
 template <class T, class G, class R> struct EClos;
 template <class G, class R> struct EClos<NullType,G,R> {typedef R Result;};
 template <int N, class T, class G, class R> struct EClos<Set<N,T>,G,R>
@@ -80,12 +95,25 @@ template <int N, class T, class G, class R> struct EClos<Set<N,T>,G,R>
                           >::Result Result;
 };
 
+// Вычисление хода из множества вершин                                                                              *
+// T - Состояние
+// G - Граф
+// R - Результирующее состояние
+// a - Символ алфавита
 template <class T, class G, class R, int a> struct MoveSet;
 template <class G, class R, int a> struct MoveSet<NullType,G,R,a> {typedef R Result;};
 template <int N, class T, class G, class R, int a> struct MoveSet<Set<N,T>,G,R,a>
 { typedef typename MoveSet<T,G,typename Join<R,typename Move<N,G,NullType,a>::Result>::Result,a>::Result Result;
 };
 
+// Вычисление списка состояний, полученных всеми ходами из вершины                                                  *
+// N - Генератор номеров узлов
+// K - Генератор номеров финальных узлов
+// T - Алфавит
+// n - Текущий узел
+// S - Текущее состояние (Set)
+// G - Граф
+// R - Результирующий список расширенных состояний
 template <int N, int K, class T, int n, class S, class G, class R> struct MoveList;
 template <int N, int K, int n, class S, class G, class R> struct MoveList<N,K,NullType,n,S,G,R> {typedef R Result;};
 template <int N, int K, int a, class T, int n, class S, class G, class R> struct MoveList<N,K,Set<a,T>,n,S,G,R>
@@ -100,34 +128,52 @@ template <int N, int K, int a, class T, int n, class S, class G, class R> struct
                               StateListEx<n,N1,a,S1,R> >::Result Result;
 };
 
+// Построение алфавита языка по графу NFA (вычислять однократно на верхнем уровне)                                  *
+// T - Граф
+// R - Результирующий алфавит
 template <class T, class R> struct Alf;
 template <class R> struct Alf<NullType,R> {typedef R Result;};
-template <class T, int S, int D, class R> struct Alf<Node<T,S,D,0>,R> {typedef typename Alf<T,R>::Result Result;};
-template <class T, int S, int D, int a, class R> struct Alf<Node<T,S,D,a>,R>
-{ typedef typename Alf<T, typename InsSet<a,R,NullType>::Result>::Result Result;
+template <class T, int S, int D, class R> struct Alf<Edge<T,S,D,0>,R> {typedef typename Alf<T,R>::Result Result;};
+template <class T, int S, int D, int a, class R> struct Alf<Edge<T,S,D,a>,R>
+{ typedef typename Alf<T, typename AddSet<a,R,NullType>::Result>::Result Result;
 };
 
+// Инкремент генератора узлов                                                                                       *
+// T - Список состояний (StateListEx)
+// R - Результирующее значение генератора
+// F - Предикат (Exist, NotExist)
 template <class T, int R, template <int,class> class F> struct Incr;
 template <int R, template <int,class> class F> struct Incr<NullType,R,F> {enum {Result = R};};
 template <int Src, int N, int a, class S, class T, int R, template <int,class> class F> struct Incr<StateListEx<Src,N,a,S,T>,R,F>
 { enum { Result = Incr<T, (F<1,S>::Result)?((N>=R)?(N+1):R):R, F>::Result};
 };
 
+// Определение значимого узла                                                                                       *
+// N - Узел
+// G - Граф
 template <int N, class G> struct Important;
 template <int N> struct Important<N,NullType> {enum {Result = (N==1)};};
-template <int N, class T, int D> struct Important<N,Node<T,N,D,0> > {enum { Result = Important<N,T>::Result };};
-template <int N, class T, int D, int C> struct Important<N,Node<T,N,D,C> > {enum {Result = true};};
-template <int N, class T, int S, int D, int C> struct Important<N,Node<T,S,D,C> > {enum { Result = Important<N,T>::Result };};
+template <int N, class T, int D> struct Important<N,Edge<T,N,D,0> > {enum { Result = Important<N,T>::Result };};
+template <int N, class T, int D, int C> struct Important<N,Edge<T,N,D,C> > {enum {Result = true};};
+template <int N, class T, int S, int D, int C> struct Important<N,Edge<T,S,D,C> > {enum { Result = Important<N,T>::Result };};
 
+// Оптимизированное построение списка значимых узлов                                                                *
+// T - Граф
+// R - Результирующий список
 template <class T, class R> struct ImportantOpt;
-template <class R> struct ImportantOpt<NullType,R> {typedef typename InsSet<1,R,NullType>::Result Result;};
-template <class T, int S, int D, class R> struct ImportantOpt<Node<T,S,D,0>,R>
+template <class R> struct ImportantOpt<NullType,R> {typedef typename AddSet<1,R,NullType>::Result Result;};
+template <class T, int S, int D, class R> struct ImportantOpt<Edge<T,S,D,0>,R>
 { typedef typename ImportantOpt<T,R>::Result Result;
 };
-template <class T, int S, int D, int C, class R> struct ImportantOpt<Node<T,S,D,C>,R>
-{ typedef typename ImportantOpt<T,typename InsSet<S,R,NullType>::Result>::Result Result;
+template <class T, int S, int D, int C, class R> struct ImportantOpt<Edge<T,S,D,C>,R>
+{ typedef typename ImportantOpt<T,typename AddSet<S,R,NullType>::Result>::Result Result;
 };
 
+// Сравнение состояний по совокупности значимых узлов
+// A - Список узлов (Set)
+// B - Список узлов (Set)
+// G - Граф
+// I - Список значимых узлов (вычислять однократно на верхнем уровне)
 template <class A, class B, class G> struct EquEx
 { private:
     typedef typename Filter<A,G,NullType,Important>::Result A1;
@@ -143,16 +189,23 @@ template <class A, class B, class I> struct EquExOpt
     enum { Result = Equ<A1,B1>::Result };
 };
 
-template <class T, class R> struct NodeList;
-template <class R> struct NodeList<NullType,R> {typedef R Result;};
-template <class T, int S, int D, int C, class R> struct NodeList<Node<T,S,D,C>,R>
+// Получение списка узлов                                                                                           *
+// G - Граф
+// R - Результирующий список
+template <class T, class R> struct EdgeList;
+template <class R> struct EdgeList<NullType,R> {typedef R Result;};
+template <class T, int S, int D, int C, class R> struct EdgeList<Edge<T,S,D,C>,R>
 { private:
-    typedef typename InsSet<S,R, NullType>::Result R0;
-    typedef typename InsSet<D,R0,NullType>::Result R1;
+    typedef typename AddSet<S,R, NullType>::Result R0;
+    typedef typename AddSet<D,R0,NullType>::Result R1;
   public:
-    typedef typename NodeList<T,R1>::Result Result;
+    typedef typename EdgeList<T,R1>::Result Result;
 };
 
+// Проверка вхождения (по равенству состояний)
+// T - Контрольный список (StateList)
+// S - Искомое состояние (Set)
+// I - Список значимых узлов
 template <class T, class S, class I> struct ExistS;
 template <class S, class I> struct ExistS<NullType,S,I> {enum {Result = false};};
 template <int N, class s, class T, class S, class I> struct ExistS<StateList<N,s,T>,S,I>
@@ -162,6 +215,11 @@ template <int N, class s, class T, class S, class I> struct ExistS<StateList<N,s
        };
 };
 
+// Отброс ранее найденных узлов
+// T - Исходный список (StateListEx)
+// С - Контрольный список (StateList)
+// I - Список значимых узлов (Set)
+// R - Результирующий список (StateListEx)
 template <class T, class C, class I, class R> struct FilterT;
 template <class C, class I, class R> struct FilterT<NullType,C,I,R> {typedef R Result;};
 template <int Src, int Dst, int a, class S, class T, class C, class I, class R> struct FilterT<StateListEx<Src,Dst,a,S,T>,C,I,R>
@@ -171,21 +229,41 @@ template <int Src, int Dst, int a, class S, class T, class C, class I, class R> 
                      >::Result Result;
 };
 
+// Формирование результирующего графа
+// T - Множество ранее сформированных вершин (StateList)
+// a - Символ перехода к искомой вершине
+// S - Исходное состояние (Set)
+// I - Список значимых узлов
+// R - Формируемый граф
 template <class T, int Src, int Dst, int a, class S, class I, class R> struct GenImpl;
 template <int Src, int Dst, int a, class S, class I, class R> struct GenImpl<NullType,Src,Dst,a,S,I,R> {typedef R Result;};
 template <int n, class s, class T, int Src, int Dst, int a, class S, class I, class R> struct GenImpl<StateList<n,s,T>,Src,Dst,a,S,I,R>
 { typedef typename If<Equ<s,S>::Result, // EquExOpt<s,S,I>
-                      Node<R,Src,n,a>,
+                      Edge<R,Src,n,a>,
                       typename GenImpl<T,Src,Dst,a,S,I,R>::Result
                      >::Result Result;
 };
 
+// Формирование результирующего графа
+// T - Множество новых узлов
+// С - Ранее сформированные узлы
+// I - Множество значимых узлов
+// R - Результирующий граф
 template <class T, class C, class I, class R> struct Gen;
 template <class C, class I, class R> struct Gen<NullType,C,I,R> {typedef R Result;};
 template <int Src, int Dst, int a,class S, class T, class C, class I, class R> struct Gen<StateListEx<Src,Dst,a,S,T>,C,I,R>
 { typedef typename Gen<T,C,I,typename GenImpl<C,Src,Dst,a,S,I,R>::Result>::Result Result;
 };
 
+// Шаг преобразования
+// N - Генератор номеров результирующих узлов
+// K - Генератор номеров финальных узлов
+// G - Граф (NFA)
+// A - Алфавит (Set)
+// I - Список значимых узлов (Set)
+// R - Результирующий граф (DFA)
+// M - Список помеченных состояний (StateList)
+// D - Список непомеченных состояний (StateListEx)
 template <int N, int K, class G, class A, class I, class R, class M, class D> struct ConvertImpl;
 template <int N, int K, class G, class A, class I, class R, class M> struct ConvertImpl<N,K,G,A,I,R,M,NullType> {typedef R Result;};
 template <int N, int K, class G, class A, class I, class R, class M, int Src, int Dst, int a, class S, class D> 
@@ -204,6 +282,9 @@ struct ConvertImpl<N,K,G,A,I,R,M,StateListEx<Src,Dst,a,S,D> >
     typedef typename ConvertImpl<N1,K1,G,A,I,R1,M1,D1>::Result Result;
 };
 
+// Преобразование NFA -> DFA
+// G - Граф
+// R - Результирующий граф
 template <class G, class R> struct Convert
 { private:
     typedef typename Alf<G,NullType>::Result A;
